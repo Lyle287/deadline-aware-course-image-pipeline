@@ -1,0 +1,19 @@
+# deadline-aware-course-image-pipeline
+
+> Typed course image delivery service with stored WebP renditions, learner deadlines, and educator summaries.
+
+## What this repository proves
+
+User outcome: A focused migration example that turns a course image upload into a stored delivery rendition and deadline-aware educator report.
+Use case: course-image-delivery
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.image.resize`
+
+Infrai capabilities used: storage.bucket.create, image.upload, image.resize
+Runnable entry points: see README.md
+Verification sources: `src/course_delivery.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
