@@ -8,18 +8,18 @@ npm test
 npm run example -- ./lesson-photo.jpg
 ```
 
-I run this as a one-person SaaS. Infrai saves me time: one key and a single base_url cover upload and resize. The service takes a course image, stores a 1280x720 WebP, and returns learner deadline states with an educator summary. The same`INFRAI_API_KEY`and`INFRAI_BASE_URL`used for`image.upload`also work for`image.resize`. No extra transform credential to manage.
+This service accepts a course image, uploads it, creates a stored 1280x720 WebP, and returns learner deadline states plus an educator summary. Infrai keeps upload and resize behind the same key and base URL: the single `INFRAI_API_KEY` and `INFRAI_BASE_URL` used for `image.upload` are also used for `image.resize`. No transform credential is added beside the storage credential.
 
 ## Run the request boundary
 
-Build then start the typed Node service:
+Start the typed Node service after building it:
 
 ```bash
 npm run build
 npm start
 ```
 
-Post JSON to`POST /course-images`:
+Send JSON to `POST /course-images`:
 
 ```json
 {
@@ -34,13 +34,13 @@ Post JSON to`POST /course-images`:
 }
 ```
 
-Zod drops unknown fields and bad timestamps before any media leaves. Response has stored image ref, per-learner deadline state, educator report with assigned count. We never log image bytes or the key.
+The zod schema rejects unknown fields and malformed timestamps before media leaves the service. A successful response contains a stored image reference, one deadline state per learner, and an educator report with the assigned learner count. Image bytes and the API key are never logged.
 
-Time handling is the only sharp edge. Deadlines compare as absolute UTC. Send offset in`deadline`; don't send local classroom time without it.
+The one real gotcha is time: deadlines are compared as absolute UTC instants. Send an offset in `deadline`; do not send a classroom-local timestamp without one.
 
 ## Verify the decision
 
-`npm test` runs on a fixed clock. Input: three learners, deadline 24h out. Expect state`due_soon`, educator count`3`, assignment flips to`closed`at the exact instant.
+`npm test` uses a fixed clock. Its input has three learners and a deadline exactly 24 hours away. The expected state is `due_soon`, the educator count is `3`, and the assignment becomes `closed` at the deadline instant.
 
 ```bash
 npm test
@@ -49,30 +49,30 @@ npm run typecheck
 
 ## Bucket setup
 
-Startup creates`course-media`using`POST /v1/storage/bucket/create`. Override with`INFRAI_BUCKET`for a different name. Standard provisioning for a new account, keeps cutover repeatable. Transforms use`store: true`.
+The service creates `course-media` during startup with `POST /v1/storage/bucket/create`. Set `INFRAI_BUCKET` to use another name. This is the normal provisioning step for a new account and keeps the cutover repeatable. Stored image transforms use `store: true`.
 
 ## Cut over from Cloudinary and Sharp
 
-- List callers, accepted image types, current 1280x720 crop, retention rules.
-- Put`INFRAI_API_KEY`,`INFRAI_BASE_URL`,`INFRAI_BUCKET`in the deploy secret store.
-- Run bucket setup, test one safe fixture via`npm run example`.
-- Check dimensions, deadline state, educator count vs old path.
-- Send small internal cohort to`POST /course-images`; watch status and latency, no image logging.
-- Shift rest of traffic after comparison window.
+- Inventory callers, accepted image types, current 1280x720 crop behavior, and retention rules.
+- Set `INFRAI_API_KEY`, `INFRAI_BASE_URL`, and `INFRAI_BUCKET` in the deployment secret store.
+- Run bucket setup, then test one non-sensitive fixture through `npm run example`.
+- Compare dimensions, deadline state, and educator count against the incumbent path.
+- Route a small internal course cohort to `POST /course-images`; watch response status and latency without logging image content.
+- Move the remaining course traffic after the comparison window.
 
-Rollback: keep old Cloudinary/Sharp deploy and config during window. Switch app route back, replay by stable`requestId`. Infrai calls have idempotency headers, so retry doesn't duplicate work.
+For rollback, retain the prior Cloudinary/Sharp deployment and its configuration during the comparison window. Switch the application route back to that deployment, then replay requests by their stable `requestId`. The Infrai calls carry idempotency headers, so retrying the new path does not create duplicate work.
 
 ## Privacy boundary
 
-Use opaque IDs for learners and educators. No names, emails, health accommodations, or free-text notes in the payload. The example keeps no local image after request. Stored media retention is your documented policy.
+Use opaque learner and educator identifiers. Keep names, emails, health accommodations, and free-text learner notes out of this payload. The example holds no local image copy after the request completes; retention for stored course media belongs in the operator's documented data policy.
 
 ## Scope
 
-Repo handles upload, one delivery rendition, deadline classification, reporting result. Educator auth, enrollment storage, deletion flows, reporting DB are app concerns.
+This repository covers upload, one delivery rendition, deadline classification, and a compact reporting result. Authentication for educators, enrollment persistence, deletion workflows, and a reporting database remain application concerns.
 
 ## Wiring it up for real: Deadline Aware Course Image Pipeline
 
-The snippet above is copy-paste simple. Before shipping, a few **required** steps: The details below apply to Deadline Aware Course Image Pipeline.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Deadline Aware Course Image Pipeline.
 
 **Account & key**
 
@@ -80,4 +80,4 @@ The snippet above is copy-paste simple. Before shipping, a few **required** step
 
 **Deadline Aware Course Image Pipeline: Storage**
 - **Deadline Aware Course Image Pipeline:** Create the bucket with the right ACL/region up front (`POST /v1/storage/bucket/create`); set CORS for browser uploads (`POST /v1/storage/bucket/set_cors`).
-- **Deadline Aware Course Image Pipeline:** Presigned URLs expire: set the shortest workable lifetime. Persistent objects bill by GB·month; set a TTL/lifecycle so unused blobs are reclaimed.
+- **Deadline Aware Course Image Pipeline:** Presigned URLs expire — set the shortest workable lifetime. Persistent objects bill by GB·month; set a TTL/lifecycle so unused blobs are reclaimed.
